@@ -5,16 +5,16 @@ import path from 'path';
 import { execSync } from 'child_process';
 import fs from 'fs';
 
-// Get version from environment, git tag, or package.json
 function getVersion(): string {
-  // 1. Environment variable (set by GitHub Actions)
   if (process.env.VERSION) {
     return process.env.VERSION;
   }
 
-  // 2. Try git tag
   try {
-    const gitTag = execSync('git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
+    const gitTag = execSync(
+      'git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo ""',
+      { encoding: 'utf8' }
+    ).trim();
     if (gitTag) {
       return gitTag;
     }
@@ -22,7 +22,6 @@ function getVersion(): string {
     // Git not available or no tags
   }
 
-  // 3. Fall back to package.json version
   try {
     const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
     if (pkg.version && pkg.version !== '0.0.0') {
@@ -35,16 +34,31 @@ function getVersion(): string {
   return 'dev';
 }
 
-// https://vitejs.dev/config/
+const APP_VERSION = getVersion();
+
+// Vite's `define` only substitutes identifiers inside JS/TS source, not inside
+// index.html. We hook the index pipeline so the inlined meta tag carries the
+// build version too, then the runtime can read it from DOM for cache-busting.
+const injectAppVersionIntoHtml = () => ({
+  name: 'inject-app-version',
+  transformIndexHtml: {
+    order: 'pre' as const,
+    handler(html: string) {
+      return html.replaceAll('__APP_VERSION__', APP_VERSION);
+    },
+  },
+});
+
 export default defineConfig({
   plugins: [
+    injectAppVersionIntoHtml(),
     react(),
     viteSingleFile({
       removeViteModuleLoader: true
     })
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(getVersion())
+    __APP_VERSION__: JSON.stringify(APP_VERSION)
   },
   resolve: {
     alias: {

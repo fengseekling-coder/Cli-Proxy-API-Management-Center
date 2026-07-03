@@ -6,6 +6,7 @@ import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/router/ProtectedRoute';
 import { useLanguageStore, useThemeStore } from '@/stores';
+import { useAssetVersionWatcher } from '@/hooks/useAssetVersionWatcher';
 
 function RootShell() {
   return (
@@ -38,6 +39,8 @@ function App() {
   const initializeTheme = useThemeStore((state) => state.initializeTheme);
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);
+
+  useAssetVersionWatcher();
 
   useEffect(() => {
     const cleanupTheme = initializeTheme();

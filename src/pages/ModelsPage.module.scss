@@ -288,19 +288,22 @@
 
 .groupHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   padding: $spacing-md $spacing-lg;
   background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
   border-bottom: 1px solid var(--border-color);
-  gap: $spacing-sm;
+  gap: $spacing-sm $spacing-md;
 }
 
 .groupTitle {
   display: flex;
   align-items: baseline;
   gap: $spacing-sm;
-  flex-shrink: 0;
+  min-width: 0;
+  flex-shrink: 1;
+  flex-basis: auto;
 }
 
 .groupName {
@@ -309,6 +312,10 @@
   color: var(--text-primary);
   letter-spacing: 0.02em;
   text-transform: capitalize;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .groupCount {
@@ -332,6 +339,8 @@
   letter-spacing: 0.02em;
   border: 1px solid transparent;
   cursor: help;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .groupBadgeOfficial {
@@ -372,6 +381,11 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   opacity: 0.85;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
 }
 
 .tableWrap {

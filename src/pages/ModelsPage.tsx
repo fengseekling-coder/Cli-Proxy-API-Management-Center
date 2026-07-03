@@ -361,7 +361,7 @@ export function ModelsPage() {
                         rel="noopener noreferrer"
                         title={tooltip}
                       >
-                        {badge.label}
+                        {badge.label} <span className={styles.groupBadgeUrl}>{badge.url}</span>
                       </a>
                     );
                   }

@@ -41,9 +41,15 @@ const OWNER_LABEL_MAP: Record<string, string> = {
 };
 
 // Provider labels that map to a third-party upstream that serves the OpenAI
-// official API. Right now only `codex` does — surfaced as a small "官方" tag.
+// official API. Right now `codex` → OpenAI, `ark` → Volcengine coding,
+// `gemini` → Google, `ollama` → local. All four are reached via the vendor's
+// first-party endpoint (or local daemon), so we tag each with its official
+// upstream name.
 const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
   'codex': 'OpenAI 官方',
+  'ark': '火山引擎 官方',
+  'gemini': 'Google 官方',
+  'ollama': '本机 Ollama',
 };
 
 // Provider labels that are reached via a reverse-proxy / forwarding service

@@ -56,8 +56,13 @@ const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
 // rather than the upstream vendor's own API. Tagging these as "中转站" makes
 // it obvious that requests hop through a third party (rsx terminates at a
 // paid Claude-mirror host) before reaching the real vendor.
-const PROXY_LABEL: Record<string, string> = {
-  'rsx': '中转站',
+//
+// `url` is the homepage of the proxy vendor — when present, the badge is
+// rendered as an anchor so a click takes the operator straight to the
+// dashboard / billing page for that service.
+type ProxyBadge = { label: string; url?: string };
+const PROXY_LABEL: Record<string, ProxyBadge> = {
+  'rsx': { label: '中转站', url: 'https://rsxermu666.cn' },
 };
 
 const normalizeProviderLabel = (ownedBy: string): string => {
@@ -70,15 +75,18 @@ const normalizeProviderLabel = (ownedBy: string): string => {
 //   1. Official upstream tag (e.g. "OpenAI 官方" for codex, "Google 官方"
 //      for gemini) — request lands on the vendor's first-party endpoint.
 //   2. Proxy tag (e.g. "中转站" for rsx) — request hops through a third
-//      party before reaching the real vendor.
+//      party before reaching the real vendor. When the proxy vendor has a
+//      known homepage (see PROXY_LABEL), the badge is rendered as a link
+//      so the operator can jump straight to its dashboard.
 // (The earlier "自定义 alias ×N" badge was dropped; user preferred to
 //  keep the header uncluttered and let the model id speak for itself.)
-const groupBadgesFor = (source: string, _list: DisplayModel[]): string[] => {
-  const badges: string[] = [];
+type GroupBadge = { label: string; variant: 'Official' | 'Proxy'; url?: string };
+const groupBadgesFor = (source: string, _list: DisplayModel[]): GroupBadge[] => {
+  const badges: GroupBadge[] = [];
   const official = OFFICIAL_UPSTREAM_LABEL[source];
-  if (official) badges.push(official);
+  if (official) badges.push({ label: official, variant: 'Official' });
   const proxy = PROXY_LABEL[source];
-  if (proxy) badges.push(proxy);
+  if (proxy) badges.push({ label: proxy.label, variant: 'Proxy', url: proxy.url });
   return badges;
 };
 
@@ -326,26 +334,40 @@ export function ModelsPage() {
                   <span className={styles.groupName}>{source}</span>
                   <span className={styles.groupCount}>{list.length}</span>
                 </div>
-                {badges.map((label) => {
-                  const variant = label === PROXY_LABEL['rsx']
-                    ? 'Proxy'
-                    : 'Official';
-                  const tooltip = variant === 'Proxy'
-                    ? t('models.proxy_tooltip', {
-                        defaultValue:
-                          'Reverse-proxied via a third-party forwarding service before reaching the upstream vendor.',
-                      })
+                {badges.map((badge) => {
+                  const tooltip = badge.variant === 'Proxy'
+                    ? badge.url
+                      ? t('models.proxy_tooltip_with_url', {
+                          defaultValue:
+                            'Reverse-proxied via a third-party forwarding service. Click to open the provider homepage.',
+                          url: badge.url,
+                        })
+                      : t('models.proxy_tooltip', {
+                          defaultValue:
+                            'Reverse-proxied via a third-party forwarding service before reaching the upstream vendor.',
+                        })
                     : t('models.codex_official_tooltip', {
                         defaultValue:
                           'Models in this group hit the upstream vendor API directly with no intermediate proxy.',
                       });
+                  const className = `${styles.groupBadge} ${styles[`groupBadge${badge.variant}`] ?? ''}${badge.url ? ` ${styles.groupBadgeLink}` : ''}`;
+                  if (badge.url) {
+                    return (
+                      <a
+                        key={badge.label}
+                        className={className}
+                        href={badge.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={tooltip}
+                      >
+                        {badge.label}
+                      </a>
+                    );
+                  }
                   return (
-                    <span
-                      key={label}
-                      className={`${styles.groupBadge} ${styles[`groupBadge${variant}`] ?? ''}`}
-                      title={tooltip}
-                    >
-                      {label}
+                    <span key={badge.label} className={className} title={tooltip}>
+                      {badge.label}
                     </span>
                   );
                 })}

@@ -9,6 +9,7 @@ export interface ModelInfo {
   name: string;
   alias?: string;
   description?: string;
+  ownedBy?: string;
 }
 
 const MODEL_CATEGORIES = [
@@ -45,12 +46,16 @@ export function normalizeModelList(payload: unknown, { dedupe = false } = {}): M
 
     const alias = entry.alias || entry.display_name || entry.displayName;
     const description = entry.description || entry.note || entry.comment;
+    const ownedBy = entry.owned_by || entry.ownedBy;
     const model: ModelInfo = { name: String(name) };
     if (alias && alias !== name) {
       model.alias = String(alias);
     }
     if (description) {
       model.description = String(description);
+    }
+    if (ownedBy) {
+      model.ownedBy = String(ownedBy);
     }
     return model;
   };

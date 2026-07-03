@@ -13,6 +13,9 @@ type DisplayModel = {
 };
 
 const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): string => {
+  // Prefer the owned_by field returned by the upstream /v1/models response —
+  // it's the source of truth for which channel actually serves the model.
+  if (model.ownedBy) return model.ownedBy;
   const text = `${model.name ?? ''} ${model.alias ?? ''}`.trim();
   const slashMatch = text.match(/^([^/]+)\//);
   if (slashMatch) return slashMatch[1];

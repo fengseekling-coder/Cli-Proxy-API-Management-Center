@@ -26,6 +26,7 @@ import {
   IconSidebarQuota,
   IconSidebarStore,
   IconSidebarSystem,
+  IconSidebarModels,
   IconChevronDown,
 } from '@/components/ui/icons';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
@@ -60,6 +61,7 @@ const sidebarIcons: Record<string, ReactNode> = {
   config: <IconSidebarConfig size={18} />,
   logs: <IconSidebarLogs size={18} />,
   system: <IconSidebarSystem size={18} />,
+  models: <IconSidebarModels size={18} />,
 };
 
 interface SidebarNavLinkItem {
@@ -532,6 +534,12 @@ export function MainLayout() {
           labelKey: 'nav.dashboard',
           metaKey: 'nav_meta.dashboard',
           icon: sidebarIcons.dashboard,
+        },
+        {
+          path: '/models',
+          labelKey: 'nav.models',
+          metaKey: 'nav_meta.models',
+          icon: sidebarIcons.models,
         },
         ...(!isApiKeyFunConfigured ? [quickStartNavItem] : []),
       ],

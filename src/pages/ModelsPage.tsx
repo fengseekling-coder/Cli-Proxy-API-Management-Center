@@ -44,6 +44,18 @@ const normalizeProviderLabel = (ownedBy: string): string => {
   return OWNER_LABEL_MAP[key] ?? key;
 };
 
+// Detect when a group contains models that come from a local Codex
+// reverse-proxy (the OpenAI-compatible adapter that proxies the user's own
+// Codex CLI subscription). Those entries surface as `codex-...` model ids
+// and would otherwise hide inside the `openai` bucket.
+const isCodexModel = (id: string): boolean => /^codex[-_]?/i.test(id);
+
+const codexBadgeForGroup = (list: DisplayModel[]): string | null => {
+  const codexCount = list.filter((m) => isCodexModel(m.id)).length;
+  if (codexCount <= 0) return null;
+  return `官方 codex ×${codexCount}`;
+};
+
 const toDisplayModel = (model: ModelInfo): DisplayModel => {
   const name = model.name ?? '';
   const ownedBy = deriveOwnedByFromModelInfo(model, name);
@@ -279,11 +291,24 @@ export function ModelsPage() {
 
       {showTable && grouped.length > 0 && (
         <div className={styles.groups}>
-          {grouped.map(([source, list]) => (
+          {grouped.map(([source, list]) => {
+            const codexBadge = codexBadgeForGroup(list);
+            return (
             <section key={source} className={styles.group}>
               <header className={styles.groupHeader}>
                 <span className={styles.groupName}>{source}</span>
                 <span className={styles.groupCount}>{list.length}</span>
+                {codexBadge ? (
+                  <span
+                    className={styles.groupBadge}
+                    title={t('models.codex_badge_tooltip', {
+                      defaultValue:
+                        'This group contains models served by your local Codex reverse-proxy.',
+                    })}
+                  >
+                    {codexBadge}
+                  </span>
+                ) : null}
               </header>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -324,7 +349,8 @@ export function ModelsPage() {
                 </table>
               </div>
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

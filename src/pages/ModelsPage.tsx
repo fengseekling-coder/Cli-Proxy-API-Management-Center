@@ -27,15 +27,23 @@ const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): strin
 };
 
 // Map raw owned_by values to user-friendly provider labels so you can tell at
-// a glance which channel each model is being served through (rsx proxy, ollama,
-// ark-coding, gemini, etc.) instead of seeing the upstream vendor name.
+// a glance which channel each model is being served through. In this setup
+// the `openai` upstream is reached exclusively through the user's Codex CLI
+// OAuth subscription, so we surface the group under `codex:` to make it clear
+// the credential is a Codex team OAuth token rather than a raw OpenAI key.
 const OWNER_LABEL_MAP: Record<string, string> = {
   'rsx': 'rsx',
   'ollama-cloud': 'ollama',
   'ark-coding': 'ark',
   'gemini': 'gemini',
   'anthropic': 'rsx',
-  'openai': 'openai',
+  'openai': 'codex',
+};
+
+// Provider labels that map to a third-party upstream that serves the OpenAI
+// official API. Right now only `codex` does — surfaced as a small "官方" tag.
+const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
+  'codex': 'OpenAI 官方',
 };
 
 const normalizeProviderLabel = (ownedBy: string): string => {
@@ -48,12 +56,23 @@ const normalizeProviderLabel = (ownedBy: string): string => {
 // reverse-proxy (the OpenAI-compatible adapter that proxies the user's own
 // Codex CLI subscription). Those entries surface as `codex-...` model ids
 // and would otherwise hide inside the `openai` bucket.
-const isCodexModel = (id: string): boolean => /^codex[-_]?/i.test(id);
+const isCustomAliasModel = (id: string): boolean => /^codex[-_]?/i.test(id);
 
-const codexBadgeForGroup = (list: DisplayModel[]): string | null => {
-  const codexCount = list.filter((m) => isCodexModel(m.id)).length;
-  if (codexCount <= 0) return null;
-  return `官方 codex ×${codexCount}`;
+// Group-level badges:
+//   - For groups whose label maps to an official upstream (currently only
+//     `codex` → OpenAI), tag with "OpenAI 官方" so it's clear that even
+//     though the credential is a Codex OAuth token, the requests still
+//     land on api.openai.com.
+//   - If the group also contains user-renamed entries (model ids starting
+//     with `codex-`), surface the count so the user knows which rows are
+//     aliases vs. the upstream's default model list.
+const groupBadgesFor = (source: string, list: DisplayModel[]): string[] => {
+  const badges: string[] = [];
+  const official = OFFICIAL_UPSTREAM_LABEL[source];
+  if (official) badges.push(official);
+  const aliasCount = list.filter((m) => isCustomAliasModel(m.id)).length;
+  if (aliasCount > 0) badges.push(`自定义 alias ×${aliasCount}`);
+  return badges;
 };
 
 const toDisplayModel = (model: ModelInfo): DisplayModel => {
@@ -292,23 +311,35 @@ export function ModelsPage() {
       {showTable && grouped.length > 0 && (
         <div className={styles.groups}>
           {grouped.map(([source, list]) => {
-            const codexBadge = codexBadgeForGroup(list);
+            const badges = groupBadgesFor(source, list);
             return (
             <section key={source} className={styles.group}>
               <header className={styles.groupHeader}>
                 <span className={styles.groupName}>{source}</span>
                 <span className={styles.groupCount}>{list.length}</span>
-                {codexBadge ? (
+                {badges.map((label, idx) => (
                   <span
-                    className={styles.groupBadge}
-                    title={t('models.codex_badge_tooltip', {
-                      defaultValue:
-                        'This group contains models served by your local Codex reverse-proxy.',
-                    })}
+                    key={label}
+                    className={`${styles.groupBadge} ${
+                      label === OFFICIAL_UPSTREAM_LABEL['codex']
+                        ? styles.groupBadgeOfficial
+                        : styles.groupBadgeAlias
+                    }`}
+                    title={
+                      idx === 0 && label === OFFICIAL_UPSTREAM_LABEL['codex']
+                        ? t('models.codex_official_tooltip', {
+                            defaultValue:
+                              'Models in this group are served by the official OpenAI API using your Codex OAuth credential.',
+                          })
+                        : t('models.codex_alias_tooltip', {
+                            defaultValue:
+                              'User-defined alias on top of the upstream model list.',
+                          })
+                    }
                   >
-                    {codexBadge}
+                    {label}
                   </span>
-                ) : null}
+                ))}
               </header>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>

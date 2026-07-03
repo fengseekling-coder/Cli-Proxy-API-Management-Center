@@ -322,8 +322,10 @@ export function ModelsPage() {
             return (
             <section key={source} className={styles.group}>
               <header className={styles.groupHeader}>
-                <span className={styles.groupName}>{source}</span>
-                <span className={styles.groupCount}>{list.length}</span>
+                <div className={styles.groupTitle}>
+                  <span className={styles.groupName}>{source}</span>
+                  <span className={styles.groupCount}>{list.length}</span>
+                </div>
                 {badges.map((label) => {
                   const variant = label === PROXY_LABEL['rsx']
                     ? 'Proxy'

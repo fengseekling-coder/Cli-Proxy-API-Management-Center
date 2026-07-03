@@ -293,6 +293,14 @@
   padding: $spacing-md $spacing-lg;
   background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
   border-bottom: 1px solid var(--border-color);
+  gap: $spacing-sm;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: baseline;
+  gap: $spacing-sm;
+  flex-shrink: 0;
 }
 
 .groupName {

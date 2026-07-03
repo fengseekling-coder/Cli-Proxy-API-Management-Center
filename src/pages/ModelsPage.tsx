@@ -9,6 +9,7 @@ import styles from './ModelsPage.module.scss';
 type DisplayModel = {
   id: string;
   ownedBy: string;
+  displayName: string;
   created: number | null;
   alias: string | null;
 };
@@ -31,12 +32,36 @@ const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): strin
   return fallbackId;
 };
 
+// Map raw owned_by values to user-friendly provider labels so you can tell at
+// a glance which channel each model is being served through (rsx proxy, ollama,
+// ark-coding, gemini, etc.) instead of seeing the upstream vendor name.
+const OWNER_LABEL_MAP: Record<string, string> = {
+  'rsx': 'rsx',
+  'ollama-cloud': 'ollama',
+  'ark-coding': 'ark',
+  'gemini': 'gemini',
+  'anthropic': 'rsx',
+  'openai': 'openai',
+};
+
+const normalizeProviderLabel = (ownedBy: string): string => {
+  const key = (ownedBy ?? '').toLowerCase().trim();
+  if (!key) return 'other';
+  return OWNER_LABEL_MAP[key] ?? key;
+};
+
 const toDisplayModel = (model: ModelInfo): DisplayModel => {
   const name = model.name ?? '';
   const ownedBy = deriveOwnedByFromModelInfo(model, name);
+  const providerLabel = normalizeProviderLabel(ownedBy);
+  const bareName = name.includes('/') ? name.split('/').slice(1).join('/') : name;
+  const displayName = providerLabel && providerLabel !== 'other'
+    ? `${providerLabel}:${bareName}`
+    : bareName;
   return {
     id: name,
-    ownedBy,
+    ownedBy: providerLabel,
+    displayName,
     created: null,
     alias: model.alias ?? null,
   };
@@ -44,28 +69,12 @@ const toDisplayModel = (model: ModelInfo): DisplayModel => {
 
 const matchesQuery = (model: DisplayModel, lowerQuery: string): boolean => {
   if (!lowerQuery) return true;
-  const haystack = `${model.id} ${model.ownedBy} ${model.alias ?? ''}`.toLowerCase();
+  const haystack = `${model.id} ${model.displayName} ${model.ownedBy} ${model.alias ?? ''}`.toLowerCase();
   return haystack.includes(lowerQuery);
 };
 
-const PROVIDER_BUCKETS: Array<{ key: string; match: (text: string) => boolean; fallback?: string }> = [
-  { key: 'openai', match: (t) => /openai|gpt|o\d|^o\d|chatgpt|dall-?e|gpt-image/i.test(t) },
-  { key: 'anthropic', match: (t) => /claude|anthropic/i.test(t) },
-  { key: 'gemini', match: (t) => /gemini|gai/i.test(t) },
-  { key: 'ark', match: (t) => /\bark\b|volces|doubao|ark-coding|deepseek/i.test(t) },
-  { key: 'kimi', match: (t) => /kimi|moonshot/i.test(t) },
-  { key: 'glm', match: (t) => /glm|chatglm|zhipu/i.test(t) },
-  { key: 'qwen', match: (t) => /qwen|tongyi/i.test(t) },
-  { key: 'ollama', match: (t) => /ollama/i.test(t) },
-];
-
-const bucketProvider = (text: string): string => {
-  const lower = text.toLowerCase();
-  for (const bucket of PROVIDER_BUCKETS) {
-    if (bucket.match(lower)) return bucket.key;
-  }
-  return text || 'other';
-};
+// Grouping key is the normalized provider label (no regex guessing).
+const groupKeyOf = (model: DisplayModel): string => model.ownedBy || 'other';
 
 export function ModelsPage() {
   const { t } = useTranslation();
@@ -118,7 +127,7 @@ export function ModelsPage() {
   const providerOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const m of displayModels) {
-      const key = m.ownedBy ? bucketProvider(m.ownedBy) : 'other';
+      const key = groupKeyOf(m);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -129,8 +138,7 @@ export function ModelsPage() {
     return displayModels.filter((model) => {
       if (!matchesQuery(model, q)) return false;
       if (providerFilter !== 'all') {
-        const bucket = model.ownedBy ? bucketProvider(model.ownedBy) : 'other';
-        if (bucket !== providerFilter) return false;
+        if (groupKeyOf(model) !== providerFilter) return false;
       }
       return true;
     });
@@ -139,7 +147,7 @@ export function ModelsPage() {
   const grouped = useMemo(() => {
     const groups = new Map<string, DisplayModel[]>();
     for (const m of filtered) {
-      const key = m.ownedBy ? bucketProvider(m.ownedBy) : 'other';
+      const key = groupKeyOf(m);
       const list = groups.get(key);
       if (list) list.push(m);
       else groups.set(key, [m]);
@@ -302,7 +310,7 @@ export function ModelsPage() {
                       return (
                         <tr key={`${provider}-${m.id}`}>
                           <td className={styles.colName}>
-                            <code className={styles.modelId}>{m.id}</code>
+                            <code className={styles.modelId}>{m.displayName}</code>
                           </td>
                           <td className={styles.colProvider}>
                             <span className={styles.providerBadge}>

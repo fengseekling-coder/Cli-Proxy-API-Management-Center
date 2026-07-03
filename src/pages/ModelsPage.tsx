@@ -10,15 +10,6 @@ type DisplayModel = {
   id: string;
   ownedBy: string;
   displayName: string;
-  created: number | null;
-  alias: string | null;
-};
-
-const formatCreatedAt = (epochSeconds: number | null): string => {
-  if (!epochSeconds) return '—';
-  const date = new Date(epochSeconds * 1000);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toISOString().slice(0, 10);
 };
 
 const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): string => {
@@ -62,14 +53,12 @@ const toDisplayModel = (model: ModelInfo): DisplayModel => {
     id: name,
     ownedBy: providerLabel,
     displayName,
-    created: null,
-    alias: model.alias ?? null,
   };
 };
 
 const matchesQuery = (model: DisplayModel, lowerQuery: string): boolean => {
   if (!lowerQuery) return true;
-  const haystack = `${model.id} ${model.displayName} ${model.ownedBy} ${model.alias ?? ''}`.toLowerCase();
+  const haystack = `${model.id} ${model.displayName} ${model.ownedBy}`.toLowerCase();
   return haystack.includes(lowerQuery);
 };
 
@@ -287,10 +276,10 @@ export function ModelsPage() {
 
       {showTable && grouped.length > 0 && (
         <div className={styles.groups}>
-          {grouped.map(([provider, list]) => (
-            <section key={provider} className={styles.group}>
+          {grouped.map(([source, list]) => (
+            <section key={source} className={styles.group}>
               <header className={styles.groupHeader}>
-                <span className={styles.groupName}>{provider}</span>
+                <span className={styles.groupName}>{source}</span>
                 <span className={styles.groupCount}>{list.length}</span>
               </header>
               <div className={styles.tableWrap}>
@@ -298,35 +287,21 @@ export function ModelsPage() {
                   <thead>
                     <tr>
                       <th className={styles.colName}>{t('models.table_name')}</th>
-                      <th className={styles.colProvider}>{t('models.table_provider')}</th>
-                      <th className={styles.colAlias}>{t('models.table_alias')}</th>
-                      <th className={styles.colCreated}>{t('models.table_created')}</th>
+                      <th className={styles.colSource}>{t('models.table_source', { defaultValue: 'Source' })}</th>
                       <th className={styles.colActions} aria-label="actions" />
                     </tr>
                   </thead>
                   <tbody>
                     {list.map((m) => {
-                      const hasAlias = !!m.alias && m.alias !== m.id;
+                      const sourceLabel = m.ownedBy || t('models.no_provider');
                       return (
-                        <tr key={`${provider}-${m.id}`}>
+                        <tr key={`${source}-${m.id}`}>
                           <td className={styles.colName}>
                             <code className={styles.modelId}>{m.displayName}</code>
                           </td>
-                          <td className={styles.colProvider}>
+                          <td className={styles.colSource}>
                             <span className={styles.providerBadge}>
-                              {m.ownedBy || t('models.no_provider')}
-                            </span>
-                          </td>
-                          <td className={styles.colAlias}>
-                            {hasAlias ? (
-                              <span className={styles.aliasText}>{m.alias}</span>
-                            ) : (
-                              <span className={styles.aliasEmpty}>{t('models.no_alias')}</span>
-                            )}
-                          </td>
-                          <td className={styles.colCreated}>
-                            <span className={styles.createdText}>
-                              {formatCreatedAt(m.created)}
+                              {sourceLabel}
                             </span>
                           </td>
                           <td className={styles.colActions}>

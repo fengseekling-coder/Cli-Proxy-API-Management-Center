@@ -46,6 +46,14 @@ const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
   'codex': 'OpenAI 官方',
 };
 
+// Provider labels that are reached via a reverse-proxy / forwarding service
+// rather than the upstream vendor's own API. Tagging these as "中转站" makes
+// it obvious that requests hop through a third party (rsx terminates at a
+// paid Claude-mirror host) before reaching the real vendor.
+const PROXY_LABEL: Record<string, string> = {
+  'rsx': '中转站',
+};
+
 const normalizeProviderLabel = (ownedBy: string): string => {
   const key = (ownedBy ?? '').toLowerCase().trim();
   if (!key) return 'other';
@@ -58,18 +66,48 @@ const normalizeProviderLabel = (ownedBy: string): string => {
 // and would otherwise hide inside the `openai` bucket.
 const isCustomAliasModel = (id: string): boolean => /^codex[-_]?/i.test(id);
 
-// Group-level badges:
-//   - For groups whose label maps to an official upstream (currently only
-//     `codex` → OpenAI), tag with "OpenAI 官方" so it's clear that even
-//     though the credential is a Codex OAuth token, the requests still
-//     land on api.openai.com.
-//   - If the group also contains user-renamed entries (model ids starting
-//     with `codex-`), surface the count so the user knows which rows are
-//     aliases vs. the upstream's default model list.
+// Group-level badges, in priority order:
+//   1. Official upstream tag (e.g. "OpenAI 官方" for codex)
+//   2. Proxy tag (e.g. "中转站" for rsx) — the request hops through a third
+//      party before reaching the real vendor.
+//   3. Custom-alias count when the group holds user-renamed model ids.
+type BadgeVariant = 'Official' | 'Proxy' | 'Alias';
+
+const badgeVariantOf = (label: string): BadgeVariant => {
+  for (const v of Object.values(OFFICIAL_UPSTREAM_LABEL)) {
+    if (v === label) return 'Official';
+  }
+  for (const v of Object.values(PROXY_LABEL)) {
+    if (v === label) return 'Proxy';
+  }
+  return 'Alias';
+};
+
+type TFunction = (key: string, options?: { defaultValue?: string }) => string;
+const tooltipFor = (variant: BadgeVariant, t: TFunction): string => {
+  if (variant === 'Official') {
+    return t('models.codex_official_tooltip', {
+      defaultValue:
+        'Models in this group hit the upstream vendor API directly with no intermediate proxy.',
+    });
+  }
+  if (variant === 'Proxy') {
+    return t('models.proxy_tooltip', {
+      defaultValue:
+        'Reverse-proxied via a third-party forwarding service before reaching the upstream vendor.',
+    });
+  }
+  return t('models.codex_alias_tooltip', {
+    defaultValue: 'User-defined alias on top of the upstream model list.',
+  });
+};
+
 const groupBadgesFor = (source: string, list: DisplayModel[]): string[] => {
   const badges: string[] = [];
   const official = OFFICIAL_UPSTREAM_LABEL[source];
   if (official) badges.push(official);
+  const proxy = PROXY_LABEL[source];
+  if (proxy) badges.push(proxy);
   const aliasCount = list.filter((m) => isCustomAliasModel(m.id)).length;
   if (aliasCount > 0) badges.push(`自定义 alias ×${aliasCount}`);
   return badges;
@@ -317,29 +355,19 @@ export function ModelsPage() {
               <header className={styles.groupHeader}>
                 <span className={styles.groupName}>{source}</span>
                 <span className={styles.groupCount}>{list.length}</span>
-                {badges.map((label, idx) => (
-                  <span
-                    key={label}
-                    className={`${styles.groupBadge} ${
-                      label === OFFICIAL_UPSTREAM_LABEL['codex']
-                        ? styles.groupBadgeOfficial
-                        : styles.groupBadgeAlias
-                    }`}
-                    title={
-                      idx === 0 && label === OFFICIAL_UPSTREAM_LABEL['codex']
-                        ? t('models.codex_official_tooltip', {
-                            defaultValue:
-                              'Models in this group are served by the official OpenAI API using your Codex OAuth credential.',
-                          })
-                        : t('models.codex_alias_tooltip', {
-                            defaultValue:
-                              'User-defined alias on top of the upstream model list.',
-                          })
-                    }
-                  >
-                    {label}
-                  </span>
-                ))}
+                {badges.map((label) => {
+                  const variant = badgeVariantOf(label);
+                  const tooltip = tooltipFor(variant, t);
+                  return (
+                    <span
+                      key={label}
+                      className={`${styles.groupBadge} ${styles[`groupBadge${variant}`] ?? ''}`}
+                      title={tooltip}
+                    >
+                      {label}
+                    </span>
+                  );
+                })}
               </header>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>

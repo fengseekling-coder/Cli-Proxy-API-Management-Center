@@ -66,56 +66,19 @@ const normalizeProviderLabel = (ownedBy: string): string => {
   return OWNER_LABEL_MAP[key] ?? key;
 };
 
-// Detect when a group contains models that come from a local Codex
-// reverse-proxy (the OpenAI-compatible adapter that proxies the user's own
-// Codex CLI subscription). Those entries surface as `codex-...` model ids
-// and would otherwise hide inside the `openai` bucket.
-const isCustomAliasModel = (id: string): boolean => /^codex[-_]?/i.test(id);
-
 // Group-level badges, in priority order:
-//   1. Official upstream tag (e.g. "OpenAI 官方" for codex)
-//   2. Proxy tag (e.g. "中转站" for rsx) — the request hops through a third
+//   1. Official upstream tag (e.g. "OpenAI 官方" for codex, "Google 官方"
+//      for gemini) — request lands on the vendor's first-party endpoint.
+//   2. Proxy tag (e.g. "中转站" for rsx) — request hops through a third
 //      party before reaching the real vendor.
-//   3. Custom-alias count when the group holds user-renamed model ids.
-type BadgeVariant = 'Official' | 'Proxy' | 'Alias';
-
-const badgeVariantOf = (label: string): BadgeVariant => {
-  for (const v of Object.values(OFFICIAL_UPSTREAM_LABEL)) {
-    if (v === label) return 'Official';
-  }
-  for (const v of Object.values(PROXY_LABEL)) {
-    if (v === label) return 'Proxy';
-  }
-  return 'Alias';
-};
-
-type TFunction = (key: string, options?: { defaultValue?: string }) => string;
-const tooltipFor = (variant: BadgeVariant, t: TFunction): string => {
-  if (variant === 'Official') {
-    return t('models.codex_official_tooltip', {
-      defaultValue:
-        'Models in this group hit the upstream vendor API directly with no intermediate proxy.',
-    });
-  }
-  if (variant === 'Proxy') {
-    return t('models.proxy_tooltip', {
-      defaultValue:
-        'Reverse-proxied via a third-party forwarding service before reaching the upstream vendor.',
-    });
-  }
-  return t('models.codex_alias_tooltip', {
-    defaultValue: 'User-defined alias on top of the upstream model list.',
-  });
-};
-
-const groupBadgesFor = (source: string, list: DisplayModel[]): string[] => {
+// (The earlier "自定义 alias ×N" badge was dropped; user preferred to
+//  keep the header uncluttered and let the model id speak for itself.)
+const groupBadgesFor = (source: string, _list: DisplayModel[]): string[] => {
   const badges: string[] = [];
   const official = OFFICIAL_UPSTREAM_LABEL[source];
   if (official) badges.push(official);
   const proxy = PROXY_LABEL[source];
   if (proxy) badges.push(proxy);
-  const aliasCount = list.filter((m) => isCustomAliasModel(m.id)).length;
-  if (aliasCount > 0) badges.push(`自定义 alias ×${aliasCount}`);
   return badges;
 };
 
@@ -362,8 +325,18 @@ export function ModelsPage() {
                 <span className={styles.groupName}>{source}</span>
                 <span className={styles.groupCount}>{list.length}</span>
                 {badges.map((label) => {
-                  const variant = badgeVariantOf(label);
-                  const tooltip = tooltipFor(variant, t);
+                  const variant = label === PROXY_LABEL['rsx']
+                    ? 'Proxy'
+                    : 'Official';
+                  const tooltip = variant === 'Proxy'
+                    ? t('models.proxy_tooltip', {
+                        defaultValue:
+                          'Reverse-proxied via a third-party forwarding service before reaching the upstream vendor.',
+                      })
+                    : t('models.codex_official_tooltip', {
+                        defaultValue:
+                          'Models in this group hit the upstream vendor API directly with no intermediate proxy.',
+                      });
                   return (
                     <span
                       key={label}

@@ -9,3 +9,17 @@ export { useAuthStore } from './useAuthStore';
 export { useConfigStore } from './useConfigStore';
 export { useModelsStore } from './useModelsStore';
 export { useQuotaStore } from './useQuotaStore';
+export {
+  useTokenUsageStore,
+  expandDailyInMonth,
+  expandLastDays,
+  expandLastMonths,
+  expandLastYears,
+} from './useTokenUsageStore';
+export type {
+  TokenBreakdown,
+  DailyBucket,
+  MonthlyBucket,
+  ModelUsageState,
+  TokenUsageStoreState,
+} from './useTokenUsageStore';

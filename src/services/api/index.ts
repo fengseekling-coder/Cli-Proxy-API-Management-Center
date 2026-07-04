@@ -2,6 +2,7 @@ export * from './client';
 export * from './apiCall';
 export * from './antigravitySubscription';
 export * from './apiKeyUsage';
+export * from './usageQueue';
 export * from './config';
 export * from './configFile';
 export * from './apiKeys';

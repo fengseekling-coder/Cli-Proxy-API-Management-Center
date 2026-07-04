@@ -1,0 +1,324 @@
+@use '../../styles/variables.scss' as *;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: color-mix(in srgb, var(--bg-primary, #0d1117) 60%, rgba(0, 0, 0, 0.55));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-lg;
+  animation: overlayFade 0.18s ease;
+}
+
+@keyframes overlayFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  position: relative;
+  width: min(960px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+  padding: $spacing-xl;
+  border-radius: $radius-lg;
+  background: color-mix(in srgb, var(--bg-primary, #0d1117) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.32);
+  color: var(--text-primary);
+  animation: modalPop 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes modalPop {
+  from {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-md;
+}
+
+.headerMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--primary-color) 70%, var(--text-primary) 30%);
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.modelId {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 18px;
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-secondary) 88%);
+  border: 1px solid color-mix(in srgb, var(--primary-color) 28%, transparent);
+  padding: 4px 10px;
+  border-radius: $radius-sm;
+  display: inline-block;
+}
+
+.profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.profileNote {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: $radius-sm;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.danger:hover:not(:disabled) {
+    background: color-mix(in srgb, #c65746 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, #c65746 38%, var(--border-color));
+    color: #b03e30;
+  }
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: $spacing-md;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: $radius-md;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, var(--bg-primary) 50%);
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.summaryPrimary {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.summaryHint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-base, system-ui, sans-serif);
+}
+
+.chartSection,
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.rangeTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: $radius-full;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  border: 1px solid var(--border-color);
+}
+
+.rangeTab {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: $radius-full;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}
+
+.rangeTabActive {
+  background: var(--primary-color);
+  color: var(--floating-surface, #fffdf9);
+
+  &:hover {
+    color: var(--floating-surface, #fffdf9);
+  }
+}
+
+.chartWrap {
+  position: relative;
+  width: 100%;
+  min-height: 240px;
+  padding: 8px;
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--bg-secondary) 30%, var(--bg-primary) 70%);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chartSvg {
+  width: 100%;
+  height: auto;
+  max-height: 280px;
+  color: var(--text-primary);
+}
+
+.chartEmpty {
+  padding: 40px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: $radius-md;
+  border: 1px solid var(--border-color);
+}
+
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  }
+
+  th {
+    background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    font-weight: 600;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:hover {
+    background: color-mix(in srgb, var(--primary-color) 4%, transparent);
+  }
+}
+
+.dateCell {
+  text-align: left;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
+.numCell {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .modal {
+    padding: $spacing-md;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

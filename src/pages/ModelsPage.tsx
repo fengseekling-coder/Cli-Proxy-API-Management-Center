@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
-import { useAuthStore, useModelsStore, useNotificationStore } from '@/stores';
+import { TokenDetailModal } from '@/components/tokens/TokenDetailModal';
+import { TokenUsageCell } from '@/components/tokens/TokenUsageCell';
+import { useAuthStore, useModelsStore, useNotificationStore, useTokenUsageStore } from '@/stores';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import type { ModelInfo } from '@/utils/models';
 import styles from './ModelsPage.module.scss';
@@ -12,9 +14,21 @@ type DisplayModel = {
   displayName: string;
 };
 
+// Build a lookup that tells us whether a given model id (or its base name
+// after stripping a registered provider prefix) is in fact served by one of
+// the user-configured `openai-compatibility` providers. The proxy backend
+// publishes upstream `/v1/models` entries with the upstream's own owned_by
+// (often `openai`), which is misleading because the actual request is
+// routed through the configured relay (e.g. inroi.shop). When the user has
+// declared an explicit model list for a compatibility provider, we trust
+// that declaration over the upstream's owned_by and bucket the model under
+// that provider's group.
 const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): string => {
-  // Prefer the owned_by field returned by the upstream /v1/models response —
-  // it's the source of truth for which channel actually serves the model.
+  // Trust the upstream `owned_by` field — cli-proxy-api's /v1/models now
+  // returns distinct values for codex OAuth (`openai`) vs inroi.shop relay
+  // (`openaiRelay`), so we don't need a config-side override. When the
+  // upstream returns no owned_by, fall back to the model's prefix (e.g.
+  // `blue/gpt-5.4` → `blue`).
   if (model.ownedBy) return model.ownedBy;
   const text = `${model.name ?? ''} ${model.alias ?? ''}`.trim();
   const slashMatch = text.match(/^([^/]+)\//);
@@ -31,6 +45,9 @@ const deriveOwnedByFromModelInfo = (model: ModelInfo, fallbackId: string): strin
 // the `openai` upstream is reached exclusively through the user's Codex CLI
 // OAuth subscription, so we surface the group under `codex:` to make it clear
 // the credential is a Codex team OAuth token rather than a raw OpenAI key.
+// `openaiRelay` is the inroi.shop forwarding service — models from that
+// provider are exposed under the `blue:` prefix to keep them visually
+// distinct from a real OpenAI key.
 const OWNER_LABEL_MAP: Record<string, string> = {
   'rsx': 'rsx',
   'ollama-cloud': 'ollama',
@@ -38,6 +55,7 @@ const OWNER_LABEL_MAP: Record<string, string> = {
   'gemini': 'gemini',
   'anthropic': 'rsx',
   'openai': 'codex',
+  'openaiRelay': 'blue',
 };
 
 // Provider labels that map to a third-party upstream that serves the OpenAI
@@ -63,7 +81,16 @@ const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
 type ProxyBadge = { label: string; url?: string };
 const PROXY_LABEL: Record<string, ProxyBadge> = {
   'rsx': { label: '中转站', url: 'https://rsxermu666.cn' },
-  'openaiRelay': { label: '中转站', url: 'https://www.inroi.shop' },
+  'blue': { label: '中转站', url: 'https://www.inroi.shop' },
+};
+
+// Display titles shown in the group header. The grouping key (a short
+// lowercase tag from OWNER_LABEL_MAP) is used for the model id prefix and the
+// search/filter dropdown, but the human-facing header in ModelsPage can be
+// friendlier — e.g. `blue` is surfaced as "Blue OpenAI GPT" to make it clear
+// the group is OpenAI-family models served through a paid relay.
+const GROUP_DISPLAY_NAME: Record<string, string> = {
+  'blue': 'Blue OpenAI GPT',
 };
 
 const normalizeProviderLabel = (ownedBy: string): string => {
@@ -131,6 +158,29 @@ export function ModelsPage() {
   const [query, setQuery] = useState('');
   const [providerFilter, setProviderFilter] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [detailModel, setDetailModel] = useState<string | null>(null);
+
+  // 后端使用量轮询：连接就绪后启动，断开后停止。
+  const startTokenUsage = useTokenUsageStore((state) => state.start);
+  const stopTokenUsage = useTokenUsageStore((state) => state.stop);
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      startTokenUsage();
+    }
+    return () => {
+      stopTokenUsage();
+    };
+  }, [connectionStatus, startTokenUsage, stopTokenUsage]);
+
+  // 监听 TokenUsageCell 自定义点击事件，避免把 modelKey 一路 props 透传。
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ modelKey: string }>).detail;
+      if (detail?.modelKey) setDetailModel(detail.modelKey);
+    };
+    document.addEventListener('token-cell-click', handler as EventListener);
+    return () => document.removeEventListener('token-cell-click', handler as EventListener);
+  }, []);
 
   const load = useCallback(
     async (forceRefresh = false) => {
@@ -159,8 +209,7 @@ export function ModelsPage() {
 
   const displayModels: DisplayModel[] = useMemo(() => {
     if (models.length === 0) return [];
-    // useModelsStore normalizes payloads to ModelInfo[]; we re-derive ownedBy from name/alias.
-    return models.map(toDisplayModel);
+    return models.map((m) => toDisplayModel(m));
   }, [models]);
 
   const providerOptions = useMemo(() => {
@@ -205,29 +254,6 @@ export function ModelsPage() {
       setRefreshing(false);
     }
   };
-
-  const handleCopy = useCallback(
-    async (id: string) => {
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(id);
-        } else {
-          const ta = document.createElement('textarea');
-          ta.value = id;
-          ta.style.position = 'fixed';
-          ta.style.left = '-9999px';
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-        }
-        showNotification(t('models.copied'), 'success');
-      } catch {
-        showNotification(t('models.copy_failed'), 'error');
-      }
-    },
-    [t]
-  );
 
   const isLoading = modelsLoading || refreshing;
   const showEmpty = !isLoading && modelsError == null && displayModels.length === 0;
@@ -277,7 +303,7 @@ export function ModelsPage() {
             <option value="all">{t('models.provider_filter_all')}</option>
             {providerOptions.map(([key, count]) => (
               <option key={key} value={key}>
-                {key} ({count})
+                {GROUP_DISPLAY_NAME[key] ?? key} ({count})
               </option>
             ))}
           </select>
@@ -332,7 +358,9 @@ export function ModelsPage() {
             <section key={source} className={styles.group}>
               <header className={styles.groupHeader}>
                 <div className={styles.groupTitle}>
-                  <span className={styles.groupName}>{source}</span>
+                  <span className={styles.groupName}>
+                    {GROUP_DISPLAY_NAME[source] ?? source}
+                  </span>
                   <span className={styles.groupCount}>{list.length}</span>
                 </div>
                 {badges.map((badge) => {
@@ -379,31 +407,27 @@ export function ModelsPage() {
                     <tr>
                       <th className={styles.colName}>{t('models.table_name')}</th>
                       <th className={styles.colSource}>{t('models.table_source', { defaultValue: 'Source' })}</th>
-                      <th className={styles.colActions} aria-label="actions" />
+                      <th className={styles.colActions}>
+                        {t('models.table_tokens', { defaultValue: '本月 Token' })}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {list.map((m) => {
                       const sourceLabel = m.ownedBy || t('models.no_provider');
+                      const sourceTitle = GROUP_DISPLAY_NAME[source] ?? source;
                       return (
                         <tr key={`${source}-${m.id}`}>
                           <td className={styles.colName}>
                             <code className={styles.modelId}>{m.displayName}</code>
                           </td>
                           <td className={styles.colSource}>
-                            <span className={styles.providerBadge}>
+                            <span className={styles.providerBadge} title={sourceTitle}>
                               {sourceLabel}
                             </span>
                           </td>
                           <td className={styles.colActions}>
-                            <button
-                              type="button"
-                              className={styles.copyBtn}
-                              onClick={() => void handleCopy(m.id)}
-                              title={t('models.copy_id')}
-                            >
-                              {t('models.copy_id')}
-                            </button>
+                            <TokenUsageCell modelKey={m.id} />
                           </td>
                         </tr>
                       );
@@ -416,6 +440,12 @@ export function ModelsPage() {
           })}
         </div>
       )}
+
+      <TokenDetailModal
+        modelKey={detailModel ?? ''}
+        open={detailModel !== null}
+        onClose={() => setDetailModel(null)}
+      />
     </div>
   );
 }

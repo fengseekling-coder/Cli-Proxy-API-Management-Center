@@ -77,20 +77,31 @@ export function normalizeModelList(payload: unknown, { dedupe = false } = {}): M
     return normalized;
   }
 
-  // Models can come back from upstream APIs (or the proxy itself) under
-  // multiple id forms for the same underlying model — for example the rsx
-  // provider exposes `rsx/claude-sonnet-5` (the proxied id the proxy wants
-  // clients to use) alongside `claude-sonnet-5` (the raw id published by
-  // the upstream host). We dedupe on the *base* name (the segment after
-  // the first `/`, or the full id when none) so the UI only surfaces one
-  // row per logical model. We pass over the list twice — once preferring
-  // the prefixed form, then again allowing the bare id only when no
-  // prefixed form was seen — so the user-facing id is stable across
-  // reorderings of the upstream response.
+  // The CLI Proxy API backend republishes upstream /v1/models entries for
+  // every configured provider. Two unrelated upstreams can expose models
+  // with the same base name (e.g. the codex OAuth credential exposes
+  // `gpt-5.4` under owned_by `openai`, while the inroi.shop relay exposes
+  // `blue/gpt-5.4` under owned_by `openaiRelay`). Dedupe on the *route*
+  // (owned_by + base name) so users still see both rows in the Models page
+  // — they route to different upstreams, get billed separately, and count
+  // toward different quotas.
+  //
+  // We also keep the id-prefixed form (e.g. `blue/gpt-5.4`) when the same
+  // base name appears with and without a prefix under the same owned_by —
+  // the prefixed form is the id clients actually call, so showing it is
+  // more useful than the bare upstream id.
   const seen = new Set<string>();
   const accepted: ModelInfo[] = [];
+  const dedupeKey = (model: ModelInfo): string => {
+    const rawName = String(model?.name ?? '').trim();
+    if (!rawName) return '';
+    const slashIndex = rawName.indexOf('/');
+    const base = slashIndex >= 0 ? rawName.slice(slashIndex + 1) : rawName;
+    const ownedBy = String(model?.ownedBy ?? '').trim().toLowerCase();
+    return `${ownedBy}::${base.toLowerCase()}`;
+  };
   const accept = (model: ModelInfo): boolean => {
-    const key = dedupeKeyFor(model?.name ?? '');
+    const key = dedupeKey(model);
     if (!key || seen.has(key)) {
       return false;
     }
@@ -105,20 +116,6 @@ export function normalizeModelList(payload: unknown, { dedupe = false } = {}): M
     if (!model?.name?.includes('/')) accept(model);
   });
   return accepted;
-}
-
-/**
- * Returns the dedupe key for a model id. Strips an optional single-segment
- * prefix of the form `<prefix>/<base>` and lowercases the result so callers
- * collapse id variants that differ only in prefix or case. Plain ids (no
- * slash) are returned lowercased as-is.
- */
-function dedupeKeyFor(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return '';
-  const slashIndex = trimmed.indexOf('/');
-  const base = slashIndex >= 0 ? trimmed.slice(slashIndex + 1) : trimmed;
-  return base.toLowerCase();
 }
 
 export interface ModelGroup {

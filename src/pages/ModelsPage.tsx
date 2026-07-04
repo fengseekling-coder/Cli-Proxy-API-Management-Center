@@ -55,7 +55,7 @@ const OWNER_LABEL_MAP: Record<string, string> = {
   'gemini': 'gemini',
   'anthropic': 'rsx',
   'openai': 'codex',
-  'openaiRelay': 'blue',
+  'openairelay': 'blue',
 };
 
 // Provider labels that map to a third-party upstream that serves the OpenAI

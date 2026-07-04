@@ -83,17 +83,28 @@ export function normalizeModelList(payload: unknown, { dedupe = false } = {}): M
   // clients to use) alongside `claude-sonnet-5` (the raw id published by
   // the upstream host). We dedupe on the *base* name (the segment after
   // the first `/`, or the full id when none) so the UI only surfaces one
-  // row per logical model. Earlier occurrences win so the preferred
-  // (prefixed) form is kept when both are present in the payload.
+  // row per logical model. We pass over the list twice — once preferring
+  // the prefixed form, then again allowing the bare id only when no
+  // prefixed form was seen — so the user-facing id is stable across
+  // reorderings of the upstream response.
   const seen = new Set<string>();
-  return normalized.filter((model) => {
+  const accepted: ModelInfo[] = [];
+  const accept = (model: ModelInfo): boolean => {
     const key = dedupeKeyFor(model?.name ?? '');
     if (!key || seen.has(key)) {
       return false;
     }
     seen.add(key);
+    accepted.push(model);
     return true;
+  };
+  normalized.forEach((model) => {
+    if (model?.name?.includes('/')) accept(model);
   });
+  normalized.forEach((model) => {
+    if (!model?.name?.includes('/')) accept(model);
+  });
+  return accepted;
 }
 
 /**

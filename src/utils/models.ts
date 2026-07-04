@@ -77,15 +77,37 @@ export function normalizeModelList(payload: unknown, { dedupe = false } = {}): M
     return normalized;
   }
 
+  // Models can come back from upstream APIs (or the proxy itself) under
+  // multiple id forms for the same underlying model — for example the rsx
+  // provider exposes `rsx/claude-sonnet-5` (the proxied id the proxy wants
+  // clients to use) alongside `claude-sonnet-5` (the raw id published by
+  // the upstream host). We dedupe on the *base* name (the segment after
+  // the first `/`, or the full id when none) so the UI only surfaces one
+  // row per logical model. Earlier occurrences win so the preferred
+  // (prefixed) form is kept when both are present in the payload.
   const seen = new Set<string>();
   return normalized.filter((model) => {
-    const key = (model?.name || '').toLowerCase();
+    const key = dedupeKeyFor(model?.name ?? '');
     if (!key || seen.has(key)) {
       return false;
     }
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * Returns the dedupe key for a model id. Strips an optional single-segment
+ * prefix of the form `<prefix>/<base>` and lowercases the result so callers
+ * collapse id variants that differ only in prefix or case. Plain ids (no
+ * slash) are returned lowercased as-is.
+ */
+function dedupeKeyFor(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  const slashIndex = trimmed.indexOf('/');
+  const base = slashIndex >= 0 ? trimmed.slice(slashIndex + 1) : trimmed;
+  return base.toLowerCase();
 }
 
 export interface ModelGroup {

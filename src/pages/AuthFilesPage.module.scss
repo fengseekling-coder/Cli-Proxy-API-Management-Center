@@ -1305,6 +1305,138 @@
   text-transform: none;
 }
 
+.codexQuotaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.codexQuotaBadgeAction {
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: filter 0.15s ease, transform 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.97);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent-color, #3941ff) 60%, transparent);
+    outline-offset: 1px;
+  }
+}
+
+.codexQuotaBadgeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.codexQuotaBadgePercent {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.codexQuotaBadgeTrack {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.codexQuotaBadgeFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success-color, #22c55e);
+  transition: width 0.2s ease;
+}
+
+.codexQuotaBadgeFillHigh {
+  background: var(--success-color, #22c55e);
+}
+
+.codexQuotaBadgeFillMedium {
+  background: var(--quota-medium-color, #e0aa14);
+}
+
+.codexQuotaBadgeFillLow {
+  background: var(--danger-color, #ef4444);
+}
+
+.codexQuotaBadgeFillUnknown {
+  background: color-mix(in srgb, var(--text-tertiary, #888) 50%, transparent);
+}
+
+.codexQuotaBadgeIcon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.codexQuotaBadgeSpinner {
+  flex-shrink: 0;
+  border-color: color-mix(in srgb, var(--text-secondary, #666) 28%, transparent);
+  border-top-color: var(--text-secondary, #666);
+}
+
+.codexQuotaBadgeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--danger-color, #ef4444);
+  flex-shrink: 0;
+}
+
+.codexQuotaBadgeIdle {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+.codexQuotaBadgeLoading {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-tertiary) 86%, transparent);
+  border-color: var(--border-color);
+}
+
+.codexQuotaBadgeSuccess {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-tertiary) 78%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 78%, transparent);
+}
+
+.codexQuotaBadgeError {
+  color: var(--danger-color);
+  background: rgba($error-color, 0.08);
+  border-color: color-mix(in srgb, var(--danger-color) 70%, transparent);
+}
+
 .fileName {
   font-size: 14px;
   font-weight: 800;

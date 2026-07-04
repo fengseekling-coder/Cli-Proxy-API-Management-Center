@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { TokenDetailModal } from '@/components/tokens/TokenDetailModal';
 import { TokenUsageCell } from '@/components/tokens/TokenUsageCell';
+import { CodexGroupQuotaBadge } from '@/features/authFiles/components/CodexGroupQuotaBadge';
 import { canonicalizeModelKey } from '@/stores';
 import { useAuthStore, useModelsStore, useNotificationStore, useTokenUsageStore } from '@/stores';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
@@ -399,6 +400,7 @@ export function ModelsPage() {
                   </span>
                   <span className={styles.groupCount}>{list.length}</span>
                 </div>
+                {source === 'codex' && <CodexGroupQuotaBadge />}
                 {badges.map((badge) => {
                   const tooltip = badge.variant === 'Proxy'
                     ? badge.url

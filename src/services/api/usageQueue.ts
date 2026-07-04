@@ -125,3 +125,73 @@ export const usageQueueApi = {
       .filter((item): item is UsageQueueRecord => item !== null);
   },
 };
+
+/**
+ * 持久化 token 用量 API（<dataDir>/token_usage.json on the server）。
+ *
+ * 数据流：
+ *  1. 前端启动时 `getSummary()` — 后端是 source of truth，覆盖本地缓存。
+ *  2. 前端 `pollOnce()` 拉到新 record → 调 `mergeDelta()` 把新增 delta 同步到后端。
+ *  3. 一次性迁移：`migrateFromLocal()` 把 localStorage 的旧数据 PUT 到后端，
+ *     后端 Replace 整个文件，前端再 clear localStorage。
+ *
+ * 后端对应接口见 fork/cli332-src/internal/api/handlers/management/token_usage.go。
+ */
+export interface PersistedModelState {
+  monthly: Record<
+    string,
+    {
+      input: number;
+      output: number;
+      reasoning: number;
+      cached: number;
+      total: number;
+      requests: number;
+      daily: Record<string, {
+        input: number;
+        output: number;
+        reasoning: number;
+        cached: number;
+        total: number;
+        requests: number;
+      }>;
+    }
+  >;
+  lastUpdatedAt: number | null;
+  lifetime: {
+    input: number;
+    output: number;
+    reasoning: number;
+    cached: number;
+    total: number;
+    requests: number;
+  };
+}
+
+export interface UsageSummaryPayload {
+  version: 1;
+  models: Record<string, PersistedModelState>;
+}
+
+export const usageSummaryApi = {
+  /** 从后端读全量历史。后端空时返回空 map（首次安装是正常状态）。 */
+  async getSummary(): Promise<UsageSummaryPayload> {
+    const data = await apiClient.get<unknown>('/usage-summary', {
+      timeout: USAGE_TIMEOUT_MS,
+    });
+    if (!data || typeof data !== 'object') {
+      return { version: 1, models: {} };
+    }
+    return data as UsageSummaryPayload;
+  },
+
+  /** 把本次拉取到的新增 record 的 delta 合并到后端。幂等（多次同 delta = 一次结果）。 */
+  async mergeDelta(payload: UsageSummaryPayload): Promise<void> {
+    await apiClient.post('/usage-summary', payload, { timeout: USAGE_TIMEOUT_MS });
+  },
+
+  /** 一次性迁移：把 localStorage 的 dump 直接覆盖到后端。调用方负责之后清 localStorage。 */
+  async replace(payload: UsageSummaryPayload): Promise<void> {
+    await apiClient.put('/usage-summary', payload, { timeout: USAGE_TIMEOUT_MS });
+  },
+};

@@ -15,6 +15,9 @@ antigravity_usage.json
 codex_usage.json
 style.md
 
+# Dev SPA debug snapshot (e.g. "Save Page As..." from Chrome on /management)
+management.html
+
 node_modules
 dist
 dist-ssr

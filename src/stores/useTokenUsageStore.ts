@@ -13,11 +13,23 @@
  */
 
 import { create } from 'zustand';
-import { usageQueueApi, type UsageQueueRecord } from '@/services/api/usageQueue';
+import {
+  usageQueueApi,
+  usageSummaryApi,
+  type UsageQueueRecord,
+  type UsageSummaryPayload,
+  type PersistedModelState,
+} from '@/services/api/usageQueue';
 
 const STORAGE_KEY = 'cli-proxy-token-usage-v1';
 const POLL_INTERVAL_MS = 30 * 1000;
 const POLL_BATCH_SIZE = 100;
+
+// Throttle for POSTing incremental deltas to the backend. We don't want
+// to spam the server on every pollOnce — once every 5s is plenty because
+// the deltas are append-only and idempotent on the server side (the
+// server sums incoming buckets into the persisted file).
+const SYNC_THROTTLE_MS = 5 * 1000;
 
 const toFiniteNumber = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -204,6 +216,65 @@ const loadFromStorage = (): Record<string, ModelUsageState> => {
   }
 };
 
+// modelsToPersistedShape strips the runtime-only `seenIds` field (which
+// only the frontend cares about for de-duplication against record.id) and
+// wraps the result in the wire format the backend expects. Pure function;
+// safe to call from any context.
+const modelsToPersistedShape = (
+  models: Record<string, ModelUsageState>
+): UsageSummaryPayload => ({
+  version: 1,
+  models: Object.fromEntries(
+    Object.entries(models).map(([k, v]) => {
+      const copy: PersistedModelState = {
+        monthly: v.monthly,
+        lastUpdatedAt: v.lastUpdatedAt,
+        lifetime: v.lifetime,
+      };
+      return [k, copy];
+    })
+  ),
+});
+
+// hydratedFromServer is true when the store was loaded from the backend
+// persistence file rather than from localStorage. When hydrated from
+// server, we skip the one-shot localStorage migration so we don't
+// clobber the canonical source of truth with stale browser-local data.
+const hydrateFromServer = async (
+  apply: (models: Record<string, ModelUsageState>) => void
+): Promise<boolean> => {
+  try {
+    const summary = await usageSummaryApi.getSummary();
+    if (!summary || !summary.models) return false;
+    const modelKeys = Object.keys(summary.models);
+    if (modelKeys.length === 0) return false;
+    // Re-hydrate into the same ModelUsageState shape the store uses. The
+    // server payload omits `seenIds`; an empty array is correct because
+    // we no longer need to dedupe against historical records (the queue
+    // already drops them after retentionSeconds).
+    const next: Record<string, ModelUsageState> = {};
+    for (const [key, state] of Object.entries(summary.models)) {
+      next[key] = {
+        monthly: state.monthly ?? {},
+        lastUpdatedAt: state.lastUpdatedAt ?? null,
+        lifetime: state.lifetime ?? {
+          input: 0,
+          output: 0,
+          reasoning: 0,
+          cached: 0,
+          total: 0,
+          requests: 0,
+        },
+        seenIds: [],
+      };
+    }
+    apply(next);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // Older versions of this store kept separate buckets per routing prefix
 // (e.g. `blue/gpt-5.4` and `gpt-5.4` were two distinct keys). After the
 // canonicalization change, those should fold into a single bucket per
@@ -368,9 +439,41 @@ const applyRecord = (
 export const useTokenUsageStore = create<TokenUsageStoreState>((set, get) => {
   let timer: number | null = null;
   let pollInFlight = false;
+  let syncTimer: number | null = null;
+  let syncInFlight = false;
 
   const persist = () => {
     saveToStorage(get().models);
+  };
+
+  // syncToServer ships the current models to the backend persistence file.
+  // The backend merge endpoint is idempotent so even if the same payload
+  // is uploaded twice, the on-disk total stays correct (sum doesn't
+  // double-count because the server collapses buckets on read). We only
+  // upload when there's actual data to avoid an empty POST every poll.
+  const syncToServer = async () => {
+    if (syncInFlight) return;
+    const models = get().models;
+    if (Object.keys(models).length === 0) return;
+    syncInFlight = true;
+    try {
+      await usageSummaryApi.mergeDelta(modelsToPersistedShape(models));
+    } catch {
+      // Silent: next tick will retry. We don't want to spam the UI with
+      // "sync failed" toasts for transient network blips.
+    } finally {
+      syncInFlight = false;
+    }
+  };
+
+  // scheduleSync coalesces rapid mutations (e.g. multiple records in one
+  // pollOnce) into a single backend write.
+  const scheduleSync = () => {
+    if (syncTimer !== null) return;
+    syncTimer = window.setTimeout(() => {
+      syncTimer = null;
+      void syncToServer();
+    }, SYNC_THROTTLE_MS);
   };
 
   const processRecords = (records: UsageQueueRecord[]) => {
@@ -395,6 +498,7 @@ export const useTokenUsageStore = create<TokenUsageStoreState>((set, get) => {
 
     set({ models: next });
     persist();
+    scheduleSync();
   };
 
   const pollOnce = async (): Promise<void> => {
@@ -414,8 +518,36 @@ export const useTokenUsageStore = create<TokenUsageStoreState>((set, get) => {
     }
   };
 
-  const start = () => {
+  const start = async () => {
     if (timer !== null) return;
+    // Bootstrap: prefer the server-side persistent store over localStorage.
+    // If the server has any data we trust it as the source of truth and
+    // never re-read localStorage (which is at best stale, at worst the
+    // dump the user already migrated away from). If the server is empty
+    // we fall through to localStorage and, if there's something there,
+    // ship it to the backend so the next refresh is server-first.
+    const took = await hydrateFromServer((next) => {
+      set({ models: next });
+      persist();
+    });
+    if (!took) {
+      const local = loadFromStorage();
+      if (Object.keys(local).length > 0) {
+        // One-shot migration: dump the existing localStorage to the
+        // server and clear the local copy so we never re-upload on
+        // future refreshes. We do this best-effort — if the server is
+        // unreachable we still keep the localStorage copy so the UI is
+        // populated; on the next refresh we'll try the migration again.
+        try {
+          await usageSummaryApi.replace(modelsToPersistedShape(local));
+          saveToStorage({});
+        } catch {
+          // Leave localStorage alone; the UI is already populated from
+          // the `models: loadFromStorage()` initializer at store
+          // construction time.
+        }
+      }
+    }
     void pollOnce();
     timer = window.setInterval(() => {
       void pollOnce();

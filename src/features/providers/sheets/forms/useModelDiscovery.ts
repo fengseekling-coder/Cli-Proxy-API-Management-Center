@@ -11,6 +11,7 @@ export const MODEL_DISCOVERY_BRANDS: ReadonlyArray<ProviderBrand> = [
   'claude',
   'claudeApi',
   'openaiCompatibility',
+  'openaiRelay',
 ];
 
 export const isModelDiscoveryBrand = (brand: ProviderBrand): boolean =>
@@ -77,7 +78,7 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           baseHeaders,
           resolvedAuthIndex
         );
-      } else if (brand === 'openaiCompatibility') {
+      } else if (brand === 'openaiCompatibility' || brand === 'openaiRelay') {
         const firstEntry = (apiKeyEntries ?? []).find(
           (e) =>
             (e.apiKey ?? '').trim() || (e.existingApiKey ?? '').trim() || (e.authIndex ?? '').trim()

@@ -3,6 +3,7 @@ import { IconExternalLink, IconPlus, IconSearch } from '@/components/ui/icons';
 import type { ProviderRecentUsageMap } from '@/components/providers/utils';
 import { PROVIDER_LOGOS } from '../brandLogos';
 import { CLAUDE_API_AFFILIATE_URL } from '../claudeApi';
+import { OPENAI_RELAY_HOMEPAGE_URL } from '../openaiRelay';
 import { APIKEY_FUN_AFFILIATE_URL, APIKEY_FUN_DASHBOARD_URL } from '../sponsor';
 import { getSponsorProviderDefinition } from '../sponsorDefinitions';
 import type { ProviderGroup, ProviderResource } from '../types';
@@ -59,12 +60,15 @@ export function ProviderResourcePanel({
   const showSponsorRegistrationLink = group.id === 'apikeyFun' && !hasProviderInfo;
   const showSponsorDashboardLink = group.id === 'apikeyFun' && hasProviderInfo;
   const showClaudeApiSponsorLink = group.id === 'claudeApi';
+  const showOpenaiRelaySponsorLink = group.id === 'openaiRelay';
   const registrationUrl =
     group.id === 'claudeApi'
       ? CLAUDE_API_AFFILIATE_URL
       : group.id === 'code0'
         ? getSponsorProviderDefinition('code0').affiliateUrl
-        : null;
+        : group.id === 'openaiRelay'
+          ? OPENAI_RELAY_HOMEPAGE_URL
+          : null;
   const emptyText = showSponsorRegistrationLink
     ? t('providersPage.sponsor.emptyRegisterHint')
     : t('providersPage.table.empty');
@@ -123,6 +127,17 @@ export function ProviderResourcePanel({
                 <span className={styles.sponsorLinkText}>
                   {t('providersPage.sponsor.dashboardLink')}
                 </span>
+                <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
+              </a>
+            ) : showOpenaiRelaySponsorLink && registrationUrl ? (
+              <a
+                className={`${styles.sponsorLink} ${styles.sponsorLinkEmphasis}`}
+                href={registrationUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={registrationUrl}
+              >
+                <span className={styles.sponsorLinkText}>{registrationUrl}</span>
                 <IconExternalLink className={styles.sponsorLinkIcon} size={14} />
               </a>
             ) : showClaudeApiSponsorLink || registrationUrl ? (

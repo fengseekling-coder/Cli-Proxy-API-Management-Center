@@ -14,6 +14,11 @@ import {
   getCode0ProtocolUrls,
   resolveCode0BaseUrl,
 } from './code0';
+import {
+  OPENAI_RELAY_DISPLAY_NAME,
+  OPENAI_RELAY_OPENAI_BASE_URL,
+  // isOpenaiRelayProvider, // TODO(openaiRelay): wire up once the resource branch lands
+} from './openaiRelay';
 import type {
   ProviderBrand,
   ProviderResource,
@@ -144,6 +149,37 @@ export function openaiToResource(config: OpenAIProviderConfig, index: number): P
     disabled: config.disabled === true,
     flags: {},
     selector: { brand: 'openaiCompatibility', name, index },
+    raw: config,
+  };
+}
+
+export function openaiRelayToResource(
+  config: OpenAIProviderConfig,
+  index: number
+): ProviderResource {
+  const firstEntry = config.apiKeyEntries?.[0];
+  const previewApiKey = firstEntry?.apiKey ? maskApiKey(firstEntry.apiKey) : null;
+  return {
+    id: buildId('openaiRelay', index, truncateForId(firstEntry?.apiKey ?? '') || `#${index}`),
+    brand: 'openaiRelay',
+    originalIndex: index,
+    name: OPENAI_RELAY_DISPLAY_NAME,
+    identifier: OPENAI_RELAY_DISPLAY_NAME,
+    apiKeyPreview: previewApiKey,
+    apiKey: null,
+    authIndex: config.authIndex ?? null,
+    baseUrl: config.baseUrl ?? OPENAI_RELAY_OPENAI_BASE_URL,
+    proxyUrl: null,
+    prefix: config.prefix ?? null,
+    modelCount: config.models?.length ?? 0,
+    models: collectModelNames(config.models),
+    priority: normalizePriority(config.priority),
+    headerCount: countHeaders(config.headers),
+    excludedModelCount: 0,
+    apiKeyEntryCount: config.apiKeyEntries?.length ?? 0,
+    disabled: config.disabled === true,
+    flags: {},
+    selector: { brand: 'openaiRelay', index },
     raw: config,
   };
 }

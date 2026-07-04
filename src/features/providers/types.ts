@@ -12,7 +12,8 @@ export type ProviderBrand =
   | 'vertex'
   | 'openaiCompatibility'
   | 'apikeyFun'
-  | 'code0';
+  | 'code0'
+  | 'openaiRelay';
 
 export type SponsorProviderBrand = 'apikeyFun' | 'code0';
 
@@ -42,7 +43,8 @@ export type ProviderResourceSelector =
       claudeIndices: number[];
       codexIndices: number[];
       geminiIndices: number[];
-    };
+    }
+  | { brand: 'openaiRelay'; index: number };
 
 export interface ProviderResourceFlags {
   cloakEnabled?: boolean;

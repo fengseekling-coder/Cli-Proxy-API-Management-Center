@@ -179,7 +179,7 @@ export function useConnectivityTest(
 
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
-      if (brand !== 'openaiCompatibility') return false;
+      if (brand !== 'openaiCompatibility' && brand !== 'openaiRelay') return false;
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -276,7 +276,7 @@ export function useConnectivityTest(
   );
 
   const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility') return;
+    if (brand !== 'openaiCompatibility' && brand !== 'openaiRelay') return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));

@@ -15,6 +15,7 @@ import {
   code0ToResource,
   codexToResource,
   geminiToResource,
+  // openaiRelayToResource, // TODO(openaiRelay): wire up once the case branch lands
   openaiToResource,
   vertexToResource,
 } from './adapters';
@@ -42,6 +43,12 @@ import {
   isCode0GeminiProvider,
   isCode0OpenAIProvider,
 } from './code0';
+import {
+  OPENAI_RELAY_OPENAI_BASE_URL,
+  OPENAI_RELAY_PROVIDER_NAME,
+  // buildOpenaiRelayRaw, // TODO(openaiRelay): wire up once the case branch lands
+  // isOpenaiRelayProvider, // TODO(openaiRelay): wire up once the case branch lands
+} from './openaiRelay';
 import {
   getSponsorProviderDefinition,
   type SponsorProtocolUrls,
@@ -216,6 +223,47 @@ const buildOpenAIConfig = (
     testModel: input.testModel?.trim() || undefined,
   };
 };
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const buildOpenaiRelayConfig = (
+  input: ProviderEntryFormInput,
+  existing?: OpenAIProviderConfig | null
+): OpenAIProviderConfig => {
+  const headers = headersFromEntries(input.headers);
+  const models = buildModelAliases(input.models, true);
+  const apiKeyEntries =
+    input.apiKeyEntries
+      ?.map((entry, index) => {
+        const fallbackApiKey =
+          entry.existingApiKey?.trim() || existing?.apiKeyEntries?.[index]?.apiKey?.trim() || '';
+        return {
+          apiKey: entry.apiKey.trim() || fallbackApiKey,
+          proxyUrl: entry.proxyUrl.trim() || undefined,
+          authIndex: entry.authIndex?.trim() || undefined,
+        };
+      })
+      .filter((entry) => entry.apiKey) ?? [];
+
+  return {
+    ...(existing ?? {}),
+    name: OPENAI_RELAY_PROVIDER_NAME,
+    baseUrl: OPENAI_RELAY_OPENAI_BASE_URL,
+    prefix: input.prefix.trim() || undefined,
+    apiKeyEntries,
+    disabled: input.disabled,
+    disableCooling: input.disableCooling === true,
+    headers: Object.keys(headers).length ? headers : undefined,
+    models: models.length ? models : undefined,
+    priority: input.priority,
+    testModel: input.testModel?.trim() || undefined,
+  };
+};
+
+// TODO(openaiRelay): remove once createProvider dispatches case 'openaiRelay'
+// builds the same OpenAIProviderConfig via this helper. Kept here so the
+// openaiRelay provider skeleton isn't lost while the case branch is being
+// reattached from the partial edit.
+void buildOpenaiRelayConfig;
 
 const removeSponsorEntries = <T>(list: T[], indices: number[]): T[] => {
   const sponsorIndices = new Set(indices);

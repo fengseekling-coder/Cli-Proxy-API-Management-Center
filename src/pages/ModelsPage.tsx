@@ -63,6 +63,7 @@ const OFFICIAL_UPSTREAM_LABEL: Record<string, string> = {
 type ProxyBadge = { label: string; url?: string };
 const PROXY_LABEL: Record<string, ProxyBadge> = {
   'rsx': { label: '中转站', url: 'https://rsxermu666.cn' },
+  'openaiRelay': { label: '中转站', url: 'https://www.inroi.shop' },
 };
 
 const normalizeProviderLabel = (ownedBy: string): string => {

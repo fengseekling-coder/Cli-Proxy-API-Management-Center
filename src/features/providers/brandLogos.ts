@@ -25,4 +25,5 @@ export const PROVIDER_LOGOS: Record<ProviderBrand, ProviderBrandLogo> = {
   openaiCompatibility: { src: openaiLightLogo, darkSrc: openaiDarkLogo, transparent: true },
   apikeyFun: { src: apikeyFunLogo },
   code0: { src: code0Logo },
+  openaiRelay: { src: openaiLightLogo, darkSrc: openaiDarkLogo, transparent: true },
 };

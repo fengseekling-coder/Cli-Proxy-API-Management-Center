@@ -46,14 +46,17 @@ const columnWidths = ['180px', '220px', '72px', '138px', '174px', '176px'];
 const isSponsorResource = (resource: ProviderResource): boolean =>
   resource.brand === 'apikeyFun' || resource.brand === 'code0';
 
-const getUsageProvider = (resource: ProviderResource): string =>
-  resource.brand === 'claudeApi' ? 'claude' : resource.brand;
+const getUsageProvider = (resource: ProviderResource): string => {
+  if (resource.brand === 'claudeApi') return 'claude';
+  if (resource.brand === 'openaiRelay') return 'openai';
+  return resource.brand;
+};
 
 const resolveStatusBarData = (
   resource: ProviderResource,
   usageByProvider: ProviderRecentUsageMap
 ): StatusBarData => {
-  if (resource.brand === 'openaiCompatibility') {
+  if (resource.brand === 'openaiCompatibility' || resource.brand === 'openaiRelay') {
     return getOpenAIProviderRecentStatusData(resource.raw as OpenAIProviderConfig, usageByProvider);
   }
   return getProviderRecentStatusData(
@@ -68,7 +71,7 @@ const resolveTotalStats = (
   resource: ProviderResource,
   usageByProvider: ProviderRecentUsageMap
 ): { success: number; failure: number } => {
-  if (resource.brand === 'openaiCompatibility') {
+  if (resource.brand === 'openaiCompatibility' || resource.brand === 'openaiRelay') {
     return getOpenAIProviderTotalStats(resource.raw as OpenAIProviderConfig, usageByProvider);
   }
   return getProviderTotalStats(
@@ -117,7 +120,7 @@ export function ProviderResourceTable({
       });
       return <div className={styles.metricsCell}>{items}</div>;
     }
-    if (r.brand === 'openaiCompatibility') {
+    if (r.brand === 'openaiCompatibility' || r.brand === 'openaiRelay') {
       items.push(
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
         renderMetric('keys', t('providersPage.table.metrics.keys'), r.apiKeyEntryCount),
@@ -166,7 +169,7 @@ export function ProviderResourceTable({
         </div>
       );
     }
-    if (r.brand === 'openaiCompatibility') {
+    if (r.brand === 'openaiCompatibility' || r.brand === 'openaiRelay') {
       const extra = r.apiKeyEntryCount > 1 ? ` · +${r.apiKeyEntryCount - 1}` : '';
       return (
         <div className={styles.primaryCell}>

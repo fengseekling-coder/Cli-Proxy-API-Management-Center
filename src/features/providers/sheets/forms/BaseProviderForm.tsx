@@ -91,17 +91,21 @@ function buildInitialForm(
       experimentalCchSigning: isClaudeLikeBrand(brand) ? false : undefined,
       testModel:
         brand === 'openaiCompatibility' ||
+        brand === 'openaiRelay' ||
         brand === 'codex' ||
         isClaudeLikeBrand(brand) ||
         brand === 'gemini'
           ? ''
           : undefined,
-      apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
+      apiKeyEntries:
+        brand === 'openaiCompatibility' || brand === 'openaiRelay'
+          ? [emptyApiKeyEntry()]
+          : undefined,
     };
   }
 
   const raw = resource.raw;
-  if (brand === 'openaiCompatibility') {
+  if (brand === 'openaiCompatibility' || brand === 'openaiRelay') {
     const cfg = raw as OpenAIProviderConfig;
     return {
       apiKey: '',
@@ -254,7 +258,7 @@ export function BaseProviderForm({
 
   const fallbackApiKey = useMemo(() => {
     if (mode !== 'edit' || !resource) return '';
-    if (brand === 'openaiCompatibility') return '';
+    if (brand === 'openaiCompatibility' || brand === 'openaiRelay') return '';
     return (resource.raw as { apiKey?: string } | undefined)?.apiKey ?? '';
   }, [brand, mode, resource]);
 
@@ -452,8 +456,9 @@ export function BaseProviderForm({
     brand === 'gemini' ||
     brand === 'codex' ||
     isClaudeLikeBrand(brand) ||
-    brand === 'openaiCompatibility';
-  const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
+    brand === 'openaiCompatibility' ||
+    brand === 'openaiRelay';
+  const supportsOpenAIModelOptions = brand === 'openaiCompatibility' || brand === 'openaiRelay';
   const singleConnectivity =
     brand === 'codex'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }

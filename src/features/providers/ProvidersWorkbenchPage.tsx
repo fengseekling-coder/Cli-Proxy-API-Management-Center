@@ -83,7 +83,7 @@ const getResourceRecentSuccess = (
   if (isMultiProtocolSponsorBrand(resource.brand)) {
     return 0;
   }
-  if (resource.brand === 'openaiCompatibility') {
+  if (resource.brand === 'openaiCompatibility' || resource.brand === 'openaiRelay') {
     return getOpenAIProviderRecentWindowStats(resource.raw as OpenAIProviderConfig, usageByProvider)
       .success;
   }

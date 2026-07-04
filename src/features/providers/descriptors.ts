@@ -174,6 +174,25 @@ export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
     supportsApiKeyEntries: false,
     sheetSize: 'md',
   },
+  openaiRelay: {
+    id: 'openaiRelay',
+    supportsName: true,
+    supportsApiKey: false,
+    supportsDisabled: true,
+    supportsBaseUrl: false,
+    baseUrlRequired: false,
+    supportsProxyUrl: false,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: false,
+    supportsPriority: true,
+    supportsTestModel: true,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: true,
+    sheetSize: 'lg',
+  },
 };
 
 export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
@@ -185,4 +204,5 @@ export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
   'apikeyFun',
   'claudeApi',
   'code0',
+  'openaiRelay',
 ];

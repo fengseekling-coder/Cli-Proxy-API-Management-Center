@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { IconChartLine, IconRefreshCw, IconTimer, IconTrash2, IconX } from '@/components/ui/icons';
 import {
@@ -138,7 +139,7 @@ export function TokenDetailModal({ modelKey, open, onClose }: TokenDetailModalPr
 
   if (!open) return null;
 
-  return (
+  const modalContent = (
     <div
       className={styles.overlay}
       role="dialog"
@@ -267,6 +268,12 @@ export function TokenDetailModal({ modelKey, open, onClose }: TokenDetailModalPr
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') {
+    return modalContent;
+  }
+
+  return createPortal(modalContent, document.body);
 }
 
 interface SummaryCardProps {

@@ -3,16 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { TokenDetailModal } from '@/components/tokens/TokenDetailModal';
 import { TokenUsageCell } from '@/components/tokens/TokenUsageCell';
+import { canonicalizeModelKey } from '@/stores';
 import { useAuthStore, useModelsStore, useNotificationStore, useTokenUsageStore } from '@/stores';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import type { ModelInfo } from '@/utils/models';
 import styles from './ModelsPage.module.scss';
-
-type DisplayModel = {
-  id: string;
-  ownedBy: string;
-  displayName: string;
-};
 
 // Build a lookup that tells us whether a given model id (or its base name
 // after stripping a registered provider prefix) is in fact served by one of
@@ -126,11 +121,42 @@ const toDisplayModel = (model: ModelInfo): DisplayModel => {
   const displayName = providerLabel && providerLabel !== 'other'
     ? `${providerLabel}:${bareName}`
     : bareName;
+  // canonicalModelKey drops the routing prefix (blue/, rsx/, ollama/, ...)
+  // so the UI row keyed by canonicalModelKey matches what the token store
+  // uses. Without this, `blue/gpt-5.4` and `gpt-5.4` would each light up
+  // their own row and the user would see "0 tokens" on the row they were
+  // looking at, even after a successful test.
+  const canonicalModelKey = canonicalizeModelKey(name);
   return {
     id: name,
     ownedBy: providerLabel,
     displayName,
+    canonicalModelKey: canonicalModelKey || name,
   };
+};
+
+type DisplayModel = {
+  id: string;
+  ownedBy: string;
+  displayName: string;
+  canonicalModelKey: string;
+};
+
+// Collapse rows that share the same canonical model under the same provider
+// (e.g. `claude-sonnet-5` + `rsx/claude-sonnet-5`). The first-seen row wins
+// so the user sees the prefixed id they actually call. Without this we'd
+// render two visually-identical rows that each only light up for one of
+// the two ways the user might spell the model.
+const dedupeWithinGroup = (rows: DisplayModel[]): DisplayModel[] => {
+  const seen = new Set<string>();
+  const out: DisplayModel[] = [];
+  for (const row of rows) {
+    const key = `${row.ownedBy}::${row.canonicalModelKey.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 };
 
 const matchesQuery = (model: DisplayModel, lowerQuery: string): boolean => {
@@ -212,25 +238,35 @@ export function ModelsPage() {
     return models.map((m) => toDisplayModel(m));
   }, [models]);
 
+  // Dedupe by canonical model key within each ownedBy group before any
+  // further filtering. Without this, `claude-sonnet-5` and
+  // `rsx/claude-sonnet-5` would each render as a `rsx:claude-sonnet-5`
+  // row, only one of which lights up depending on how the user spelled
+  // the model in their request.
+  const deduped = useMemo(
+    () => dedupeWithinGroup(displayModels),
+    [displayModels]
+  );
+
   const providerOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const m of displayModels) {
+    for (const m of deduped) {
       const key = groupKeyOf(m);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [displayModels]);
+  }, [deduped]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return displayModels.filter((model) => {
+    return deduped.filter((model) => {
       if (!matchesQuery(model, q)) return false;
       if (providerFilter !== 'all') {
         if (groupKeyOf(model) !== providerFilter) return false;
       }
       return true;
     });
-  }, [displayModels, query, providerFilter]);
+  }, [deduped, query, providerFilter]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, DisplayModel[]>();
@@ -408,7 +444,7 @@ export function ModelsPage() {
                       <th className={styles.colName}>{t('models.table_name')}</th>
                       <th className={styles.colSource}>{t('models.table_source', { defaultValue: 'Source' })}</th>
                       <th className={styles.colActions}>
-                        {t('models.table_tokens', { defaultValue: '本月 Token' })}
+                        {t('models.table_tokens', { defaultValue: 'Token' })}
                       </th>
                     </tr>
                   </thead>
@@ -416,8 +452,16 @@ export function ModelsPage() {
                     {list.map((m) => {
                       const sourceLabel = m.ownedBy || t('models.no_provider');
                       const sourceTitle = GROUP_DISPLAY_NAME[source] ?? source;
+                      // Pass the canonical key to the token cell — that's
+                      // what the store buckets under. m.id may carry the
+                      // routing prefix (e.g. `rsx/claude-sonnet-5`) but
+                      // the store aggregates the same model under
+                      // `claude-sonnet-5` regardless of how the request
+                      // was spelled, so looking up by canonicalModelKey
+                      // makes the cell stay consistent.
+                      const lookupKey = m.canonicalModelKey || m.id;
                       return (
-                        <tr key={`${source}-${m.id}`}>
+                        <tr key={`${source}-${m.canonicalModelKey}`}>
                           <td className={styles.colName}>
                             <code className={styles.modelId}>{m.displayName}</code>
                           </td>
@@ -427,7 +471,7 @@ export function ModelsPage() {
                             </span>
                           </td>
                           <td className={styles.colActions}>
-                            <TokenUsageCell modelKey={m.id} />
+                            <TokenUsageCell modelKey={lookupKey} />
                           </td>
                         </tr>
                       );

@@ -6,9 +6,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconChartLine, IconTrendingUp } from '@/components/ui/icons';
-import { useTokenUsageStore } from '@/stores';
-import { resolveTokenizerForModel } from '@/utils/tokenizer';
+import { IconTrendingUp } from '@/components/ui/icons';
+import { canonicalizeModelKey, useTokenUsageStore } from '@/stores';
 import styles from './TokenUsageCell.module.scss';
 
 const numberFormatter = new Intl.NumberFormat(undefined, {
@@ -34,11 +33,13 @@ export interface TokenUsageCellProps {
 
 export function TokenUsageCell({ modelKey, fallbackEstimate }: TokenUsageCellProps) {
   const { t } = useTranslation();
-  const currentMonth = useTokenUsageStore((state) => state.getCurrentMonthUsage(modelKey));
+  // Always read stats from the canonical key so prefixed and unprefixed
+  // variants of the same model (e.g. `rsx/claude-sonnet-5` vs
+  // `claude-sonnet-5`) both light up the same row.
+  const canonicalKey = useMemo(() => canonicalizeModelKey(modelKey) || modelKey, [modelKey]);
+  const currentMonth = useTokenUsageStore((state) => state.getCurrentMonthUsage(canonicalKey));
   const lastPolledAt = useTokenUsageStore((state) => state.lastPolledAt);
   const pollOnce = useTokenUsageStore((state) => state.pollOnce);
-
-  const profile = useMemo(() => resolveTokenizerForModel(modelKey), [modelKey]);
 
   const [pulseKey, setPulseKey] = useState<number>(0);
   const lastPolledRef = useRef<number | null>(null);
@@ -72,7 +73,7 @@ export function TokenUsageCell({ modelKey, fallbackEstimate }: TokenUsageCellPro
         const target = e.currentTarget;
         const ev = new CustomEvent('token-cell-click', {
           bubbles: true,
-          detail: { modelKey, anchorRect: target.getBoundingClientRect() },
+          detail: { modelKey: canonicalKey, anchorRect: target.getBoundingClientRect() },
         });
         target.dispatchEvent(ev);
       }}
@@ -109,16 +110,6 @@ export function TokenUsageCell({ modelKey, fallbackEstimate }: TokenUsageCellPro
         >
           <polyline points="9 18 15 12 9 6" />
         </svg>
-      </span>
-      <span className={styles.meta} title={profile.label}>
-        <IconChartLine size={10} className={styles.metaIcon} aria-hidden="true" />
-        <span className={styles.metaText}>
-          {useFallback
-            ? t('models.token_cell.estimated', { defaultValue: '估算 · 当月' })
-            : t('models.token_cell.month_total', {
-                defaultValue: '本月累计',
-              })}
-        </span>
       </span>
     </button>
   );

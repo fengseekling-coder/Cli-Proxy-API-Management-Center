@@ -107,7 +107,15 @@ const normalizeRecord = (raw: unknown): UsageQueueRecord | null => {
 export const usageQueueApi = {
   /** 一次性从后端弹出一条或多条使用记录。 */
   async pop(count = 50): Promise<UsageQueueRecord[]> {
-    const data = await apiClient.get<unknown>('/v0/management/usage', {
+    // NOTE: endpoint path is /usage-queue, not /usage. /usage is an obsolete
+    // 404 path that used to (pre-restructure) return records; now
+    // /usage-queue is the canonical pop endpoint (see server.go:658
+    // mgmt.GET("/usage-queue", ...)).
+    //
+    // apiClient already prefixes every request with the management base
+    // (`<apiBase>/v0/management`), so the path here must be RELATIVE —
+    // an absolute `/v0/management/...` would be double-prefixed and 404.
+    const data = await apiClient.get<unknown>('/usage-queue', {
       params: { count },
       timeout: USAGE_TIMEOUT_MS,
     });

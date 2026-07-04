@@ -192,7 +192,7 @@
     "table_provider": "提供商",
     "table_alias": "别名",
     "table_created": "创建时间",
-    "table_tokens": "本月 Token",
+    "table_tokens": "Token",
     "copy_id": "复制 ID",
     "copied": "已复制",
     "copy_failed": "复制失败",
@@ -201,9 +201,7 @@
     "fetch_hint": "展示 {{count}} 个模型，并自动使用服务器保存的 API Key 进行鉴权。",
     "token_cell": {
       "title": "点击查看 token 消耗明细",
-      "io": "输入 {{input}} · 输出 {{output}}",
-      "month_total": "本月累计",
-      "estimated": "估算 · 当月"
+      "io": "输入 {{input}} · 输出 {{output}}"
     },
     "token_modal": {
       "eyebrow": "Token 消耗详情",

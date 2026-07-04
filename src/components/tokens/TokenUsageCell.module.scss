@@ -84,20 +84,3 @@
 .chevron {
   color: var(--text-tertiary);
 }
-
-.meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: var(--text-tertiary);
-  font-family: var(--font-base, system-ui, sans-serif);
-}
-
-.metaIcon {
-  color: var(--primary-color);
-}
-
-.metaText {
-  letter-spacing: 0.04em;
-}

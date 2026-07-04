@@ -201,9 +201,7 @@
     "fetch_hint": "Showing {{count}} models, authenticated automatically with the server's saved API key.",
     "token_cell": {
       "title": "Click for token usage details",
-      "io": "in {{input}} · out {{output}}",
-      "month_total": "month-to-date",
-      "estimated": "estimated"
+      "io": "in {{input}} · out {{output}}"
     },
     "token_modal": {
       "eyebrow": "Token usage",

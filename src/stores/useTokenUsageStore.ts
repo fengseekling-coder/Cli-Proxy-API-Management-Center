@@ -141,16 +141,53 @@ const parseRecordTimestamp = (value: string | undefined): Date | null => {
 
 const normalizeRecordModelKey = (record: UsageQueueRecord): string => {
   // 优先使用 alias（客户端看到的别名），其次使用 model 真名。
-  if (record.alias && record.alias.trim()) return record.alias.trim();
-  if (record.model && record.model.trim()) return record.model.trim();
-  if (record.endpoint) return record.endpoint;
-  return 'unknown';
+  // 不论哪一路，最终折叠成"真实模型名"（去掉路由前缀）作为聚合 key，
+  // 让同一个模型在 UI 上只占一行，跨 provider 累加 token。
+  const raw =
+    (record.alias && record.alias.trim()) ||
+    (record.model && record.model.trim()) ||
+    record.endpoint ||
+    'unknown';
+  return canonicalizeModelKey(raw);
 };
 
 const seenIdsCapacity = 4000;
 
 const trimSeenIds = (ids: number[]): number[] =>
   ids.length > seenIdsCapacity ? ids.slice(ids.length - seenIdsCapacity) : ids;
+
+// Provider prefixes that may appear in front of the upstream model id (e.g.
+// `blue/gpt-5.4`, `ollama/ollama-minimax-m3-cloud`, `rsx/claude-sonnet-5`).
+// These prefixes come from the proxy config (`openai-compatibility[].prefix`
+// or `claude-api-key[].prefix`) and are how clients distinguish routing.
+// They have nothing to do with the underlying model — `blue/gpt-5.4` and
+// `gpt-5.4` are the same model, just served through different upstreams —
+// so usage stats should aggregate under a single canonical key. Without
+// this, the UI shows two visually-identical rows for the same model and
+// each only lights up for one of the two ways a user might spell it.
+const ROUTING_PREFIXES = [
+  'blue',
+  'ark',
+  'ollama',
+  'rsx',
+  'codex',
+  'openai',
+  'gemini',
+  'anthropic',
+];
+
+const canonicalizeModelKey = (key: string): string => {
+  const trimmed = (key ?? '').trim();
+  if (!trimmed) return '';
+  const slash = trimmed.indexOf('/');
+  if (slash <= 0) return trimmed;
+  const head = trimmed.slice(0, slash).toLowerCase();
+  const tail = trimmed.slice(slash + 1).trim();
+  if (ROUTING_PREFIXES.includes(head) && tail) {
+    return tail;
+  }
+  return trimmed;
+};
 
 const loadFromStorage = (): Record<string, ModelUsageState> => {
   if (typeof localStorage === 'undefined') return {};
@@ -161,10 +198,90 @@ const loadFromStorage = (): Record<string, ModelUsageState> => {
     if (!parsed || parsed.version !== STORAGE_VERSION || typeof parsed.models !== 'object') {
       return {};
     }
-    return parsed.models;
+    return migratePersistedModels(parsed.models);
   } catch {
     return {};
   }
+};
+
+// Older versions of this store kept separate buckets per routing prefix
+// (e.g. `blue/gpt-5.4` and `gpt-5.4` were two distinct keys). After the
+// canonicalization change, those should fold into a single bucket per
+// underlying model. We merge additively so a user's accumulated stats
+// survive the upgrade rather than getting orphaned under prefixes that
+// no longer exist as UI rows.
+const migratePersistedModels = (
+  raw: Record<string, ModelUsageState>
+): Record<string, ModelUsageState> => {
+  const result: Record<string, ModelUsageState> = {};
+  for (const [key, state] of Object.entries(raw)) {
+    if (!state) continue;
+    const canonical = canonicalizeModelKey(key);
+    if (!canonical || canonical === key) {
+      result[key] = state;
+      continue;
+    }
+    const existing = result[canonical];
+    if (!existing) {
+      result[canonical] = state;
+      continue;
+    }
+    result[canonical] = mergeModelStates(existing, state, canonical);
+  }
+  return result;
+};
+
+const mergeBreakdown = (
+  a: TokenBreakdown,
+  b: TokenBreakdown
+): TokenBreakdown => ({
+  input: a.input + b.input,
+  output: a.output + b.output,
+  reasoning: a.reasoning + b.reasoning,
+  cached: a.cached + b.cached,
+  total: a.total + b.total,
+  requests: a.requests + b.requests,
+});
+
+const mergeMonthly = (a: MonthlyBucket, b: MonthlyBucket): MonthlyBucket => {
+  const daily: Record<string, DailyBucket> = { ...a.daily };
+  for (const [day, bucket] of Object.entries(b.daily)) {
+    daily[day] = daily[day]
+      ? mergeBreakdown(daily[day], bucket)
+      : { ...bucket };
+  }
+  return {
+    input: a.input + b.input,
+    output: a.output + b.output,
+    reasoning: a.reasoning + b.reasoning,
+    cached: a.cached + b.cached,
+    total: a.total + b.total,
+    requests: a.requests + b.requests,
+    daily,
+  };
+};
+
+const mergeModelStates = (
+  a: ModelUsageState,
+  b: ModelUsageState,
+  canonicalKey: string
+): ModelUsageState => {
+  const monthly: Record<string, MonthlyBucket> = { ...a.monthly };
+  for (const [month, bucket] of Object.entries(b.monthly)) {
+    monthly[month] = monthly[month]
+      ? mergeMonthly(monthly[month], bucket)
+      : { ...bucket, daily: { ...bucket.daily } };
+  }
+  return {
+    monthly,
+    lastUpdatedAt: Math.max(a.lastUpdatedAt ?? 0, b.lastUpdatedAt ?? 0),
+    lifetime: mergeBreakdown(a.lifetime, b.lifetime),
+    // Keep the seen-id set defensively even after merge — `record.id` is
+    // not currently populated by the backend so this stays empty in
+    // practice, but the cap still matters if a future version fills it in.
+    seenIds: trimSeenIds([...a.seenIds, ...b.seenIds]),
+  };
+  void canonicalKey;
 };
 
 const saveToStorage = (models: Record<string, ModelUsageState>): void => {
@@ -356,6 +473,15 @@ export const useTokenUsageStore = create<TokenUsageStoreState>((set, get) => {
     },
   };
 });
+
+/**
+ * 把模型 key 折叠成"真实模型名"（去掉路由前缀）。
+ *
+ * 例：`blue/gpt-5.4` → `gpt-5.4`、`rsx/claude-sonnet-5` → `claude-sonnet-5`。
+ * 同一模型在不同 provider 下的 alias 会聚合成同一个聚合 key，
+ * 这样 `useTokenUsageStore` 里 `blue/gpt-5.4` 和 `gpt-5.4` 会共享一份数据。
+ */
+export { canonicalizeModelKey };
 
 /** 工具函数：从 tokenUsageStore 中按模型名汇总"按月"数据，供 UI 直接消费。 */
 export function summarizeMonthly(

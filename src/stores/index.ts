@@ -11,6 +11,7 @@ export { useModelsStore } from './useModelsStore';
 export { useQuotaStore } from './useQuotaStore';
 export {
   useTokenUsageStore,
+  canonicalizeModelKey,
   expandDailyInMonth,
   expandLastDays,
   expandLastMonths,
